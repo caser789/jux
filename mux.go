@@ -83,10 +83,10 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		setCurrentRoute(req, match.Route)
 	}
 	if handler == nil {
-		if r.NotFoundHandler == nil {
-			r.NotFoundHandler = http.NotFoundHandler()
-		}
 		handler = r.NotFoundHandler
+		if handler == nil {
+			handler = http.NotFoundHandler()
+		}
 	}
 	if !r.KeepContext {
 		defer context.Clear(req)
@@ -146,6 +146,13 @@ func (r *Router) getRegexpGroup() *routeRegexpGroup {
 		return r.parent.getRegexpGroup()
 	}
 	return nil
+}
+
+func (r *Router) buildVars(m map[string]string) map[string]string {
+	if r.parent != nil {
+		m = r.parent.buildVars(m)
+	}
+	return m
 }
 
 // ----------------------------------------------------------------------------
@@ -218,6 +225,12 @@ func (r *Router) Queries(pairs ...string) *Route {
 // See Route.Schemes().
 func (r *Router) Schemes(schemes ...string) *Route {
 	return r.NewRoute().Schemes(schemes...)
+}
+
+// BuildVars registers a new route with a custom function for modifying
+// route variables before building a URL.
+func (r *Router) BuildVarsFunc(f BuildVarsFunc) *Route {
+	return r.NewRoute().BuildVarsFunc(f)
 }
 
 // ----------------------------------------------------------------------------

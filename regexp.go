@@ -31,12 +31,13 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, matchQuery, strictSlash 
 	defaultPattern := "[^/]+"
 	if matchQuery {
 		defaultPattern = "[^?&]+"
-		matchPrefix, strictSlash = true, false
+		matchPrefix = true
 	} else if matchHost {
 		defaultPattern = "[^.]+"
-		matchPrefix, strictSlash = false, false
+		matchPrefix = false
 	}
-	if matchPrefix {
+	// Only match strict slash if not matching
+	if matchPrefix || matchHost || matchQuery {
 		strictSlash = false
 	}
 	// Set a flag for strictSlash.
@@ -145,11 +146,7 @@ func (r *routeRegexp) Match(req *http.Request, match *RouteMatch) bool {
 }
 
 // url builds a URL part using the given values.
-func (r *routeRegexp) url(pairs ...string) (string, error) {
-	values, err := mapFromPairs(pairs...)
-	if err != nil {
-		return "", err
-	}
+func (r *routeRegexp) url(values map[string]string) (string, error) {
 	urlValues := make([]interface{}, len(r.varsN))
 	for k, v := range r.varsN {
 		value, ok := values[v]
@@ -245,14 +242,12 @@ func (v *routeRegexpGroup) setMatch(req *http.Request, m *RouteMatch, r *Route) 
 		}
 	}
 	// Store query string variables.
-	if v.queries != nil && len(v.queries) > 0 {
-		rawQuery := req.URL.RawQuery
-		for _, q := range v.queries {
-			queryVars := q.regexp.FindStringSubmatch(rawQuery)
-			if queryVars != nil {
-				for k, v := range q.varsN {
-					m.Vars[v] = queryVars[k+1]
-				}
+	rawQuery := req.URL.RawQuery
+	for _, q := range v.queries {
+		queryVars := q.regexp.FindStringSubmatch(rawQuery)
+		if queryVars != nil {
+			for k, v := range q.varsN {
+				m.Vars[v] = queryVars[k+1]
 			}
 		}
 	}
@@ -260,13 +255,14 @@ func (v *routeRegexpGroup) setMatch(req *http.Request, m *RouteMatch, r *Route) 
 
 // getHost tries its best to return the request host.
 func getHost(r *http.Request) string {
-	if !r.URL.IsAbs() {
-		host := r.Host
-		// Slice off any port information.
-		if i := strings.Index(host, ":"); i != -1 {
-			host = host[:i]
-		}
-		return host
+	if r.URL.IsAbs() {
+		return r.URL.Host
 	}
-	return r.URL.Host
+	host := r.Host
+	// Slice off any port information.
+	if i := strings.Index(host, ":"); i != -1 {
+		host = host[:i]
+	}
+	return host
+
 }
