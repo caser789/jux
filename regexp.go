@@ -30,7 +30,7 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, matchQuery, strictSlash 
 	// Now let's parse it.
 	defaultPattern := "[^/]+"
 	if matchQuery {
-		defaultPattern = "[^?&]+"
+		defaultPattern = "[^?&]*"
 	} else if matchHost {
 		defaultPattern = "[^.]+"
 		matchPrefix = false
@@ -84,6 +84,9 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, matchQuery, strictSlash 
 	pattern.WriteString(regexp.QuoteMeta(raw))
 	if strictSlash {
 		pattern.WriteString("[/]?")
+	}
+	if matchQuery && len(idxs) == 0 {
+		pattern.WriteString(defaultPattern)
 	}
 	if !matchPrefix {
 		pattern.WriteByte('$')
