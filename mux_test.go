@@ -131,6 +131,42 @@ func TestHost(t *testing.T) {
 			path:        "",
 			shouldMatch: false,
 		},
+		{
+			title:       "Path route with single pattern with pipe, match",
+			route:       new(Route).Path("/{category:a|b/c}"),
+			request:     newRequest("GET", "http://localhost/a"),
+			vars:        map[string]string{"category": "a"},
+			host:        "",
+			path:        "/a",
+			shouldMatch: true,
+		},
+		{
+			title:       "Path route with single pattern with pipe, match",
+			route:       new(Route).Path("/{category:a|b/c}"),
+			request:     newRequest("GET", "http://localhost/b/c"),
+			vars:        map[string]string{"category": "b/c"},
+			host:        "",
+			path:        "/b/c",
+			shouldMatch: true,
+		},
+		{
+			title:       "Path route with multiple patterns with pipe, match",
+			route:       new(Route).Path("/{category:a|b/c}/{product}/{id:[0-9]+}"),
+			request:     newRequest("GET", "http://localhost/a/product_name/1"),
+			vars:        map[string]string{"category": "a", "product": "product_name", "id": "1"},
+			host:        "",
+			path:        "/a/product_name/1",
+			shouldMatch: true,
+		},
+		{
+			title:       "Path route with multiple patterns with pipe, match",
+			route:       new(Route).Path("/{category:a|b/c}/{product}/{id:[0-9]+}"),
+			request:     newRequest("GET", "http://localhost/b/c/product_name/1"),
+			vars:        map[string]string{"category": "b/c", "product": "product_name", "id": "1"},
+			host:        "",
+			path:        "/b/c/product_name/1",
+			shouldMatch: true,
+		},
 	}
 	for _, test := range tests {
 		testRoute(t, test)
@@ -393,6 +429,24 @@ func TestHeaders(t *testing.T) {
 			host:        "",
 			path:        "",
 			shouldMatch: false,
+		},
+		{
+			title:       "Headers route, regex header values to match",
+			route:       new(Route).Headers("foo", "ba[zr]"),
+			request:     newRequestHeaders("GET", "http://localhost", map[string]string{"foo": "bar"}),
+			vars:        map[string]string{},
+			host:        "",
+			path:        "",
+			shouldMatch: false,
+		},
+		{
+			title:       "Headers route, regex header values to match",
+			route:       new(Route).HeadersRegexp("foo", "ba[zr]"),
+			request:     newRequestHeaders("GET", "http://localhost", map[string]string{"foo": "baz"}),
+			vars:        map[string]string{},
+			host:        "",
+			path:        "",
+			shouldMatch: true,
 		},
 	}
 
