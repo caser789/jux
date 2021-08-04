@@ -27,6 +27,8 @@ type Route struct {
 	name string
 	// Error resulted from building a route.
 	err error
+
+	buildVarsFunc BuildVarsFunc
 }
 
 // Match matches the route against the request.
@@ -255,8 +257,7 @@ func (r *Route) Methods(methods ...string) *Route {
 // Path -----------------------------------------------------------------------
 
 // Path adds a matcher for the URL path.
-// It accepts a template with zero or more URL variables enclosed by {}. The
-// template must start with a "/".
+// It accepts a template with zero or more URL variables enclosed by {}.
 // Variables can define an optional regexp pattern to me matched:
 //
 // - {name} matches anything until the next slash.
@@ -280,16 +281,9 @@ func (r *Route) Path(tpl string) *Route {
 
 // PathPrefix -----------------------------------------------------------------
 
-// PathPrefix adds a matcher for the URL path prefix. This matches if the given
-// template is a prefix of the full URL path. See Route.Path() for details on
-// the tpl argument.
-//
-// Note that it does not treat slashes specially ("/foobar/" will be matched by
-// the prefix "/foo") so you may want to use a trailing slash here.
-//
-// Also note that the setting of Router.StrictSlash() has no effect on routes
-// with a PathPrefix matcher.
+// PathPrefix adds a matcher for the URL path prefix.
 func (r *Route) PathPrefix(tpl string) *Route {
+	r.strictSlash = false
 	r.err = r.addRegexpMatcher(tpl, false, true)
 	return r
 }
@@ -338,6 +332,19 @@ func (r *Route) Schemes(schemes ...string) *Route {
 		schemes[k] = strings.ToLower(v)
 	}
 	return r.addMatcher(schemeMatcher(schemes))
+}
+
+// BuildVarsFunc --------------------------------------------------------------
+
+// BuildVarsFunc is the function signature used by custom build variable
+// functions (which can modify route variables before a route's URL is built).
+type BuildVarsFunc func(map[string]string) map[string]string
+
+// BuildVarsFunc adds a custom function to be used to modify build variables
+// before a route's URL is built.
+func (r *Route) BuildVarsFunc(f BuildVarsFunc) *Route {
+	r.buildVarsFunc = f
+	return r
 }
 
 // Subrouter ------------------------------------------------------------------
@@ -402,17 +409,20 @@ func (r *Route) URL(pairs ...string) (*url.URL, error) {
 	if r.regexp == nil {
 		return nil, errors.New("mux: route doesn't have a host or path")
 	}
+	values, err := r.buildVars(pairs...)
+	if err != nil {
+		return nil, err
+	}
 	var scheme, host, path string
-	var err error
 	if r.regexp.host != nil {
 		// Set a default scheme.
 		scheme = "http"
-		if host, err = r.regexp.host.url(pairs...); err != nil {
+		if host, err = r.regexp.host.url(values); err != nil {
 			return nil, err
 		}
 	}
 	if r.regexp.path != nil {
-		if path, err = r.regexp.path.url(pairs...); err != nil {
+		if path, err = r.regexp.path.url(values); err != nil {
 			return nil, err
 		}
 	}
@@ -433,7 +443,11 @@ func (r *Route) URLHost(pairs ...string) (*url.URL, error) {
 	if r.regexp == nil || r.regexp.host == nil {
 		return nil, errors.New("mux: route doesn't have a host")
 	}
-	host, err := r.regexp.host.url(pairs...)
+	values, err := r.buildVars(pairs...)
+	if err != nil {
+		return nil, err
+	}
+	host, err := r.regexp.host.url(values)
 	if err != nil {
 		return nil, err
 	}
@@ -453,13 +467,30 @@ func (r *Route) URLPath(pairs ...string) (*url.URL, error) {
 	if r.regexp == nil || r.regexp.path == nil {
 		return nil, errors.New("mux: route doesn't have a path")
 	}
-	path, err := r.regexp.path.url(pairs...)
+	values, err := r.buildVars(pairs...)
+	if err != nil {
+		return nil, err
+	}
+	path, err := r.regexp.path.url(values)
 	if err != nil {
 		return nil, err
 	}
 	return &url.URL{
 		Path: path,
 	}, nil
+}
+
+// buildVars converts the route variable pairs into a map. If the route has a
+// BuildVarsFunc, it is invoked.
+func (r *Route) buildVars(pairs ...string) (map[string]string, error) {
+	m, err := mapFromPairs(pairs...)
+	if err != nil {
+		return nil, err
+	}
+	if r.buildVarsFunc != nil {
+		m = r.buildVarsFunc(m)
+	}
+	return m, nil
 }
 
 // ----------------------------------------------------------------------------

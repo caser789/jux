@@ -94,13 +94,12 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, strictSlash bool) (*rout
 	}
 	// Done!
 	return &routeRegexp{
-		template:    template,
-		matchHost:   matchHost,
-		strictSlash: strictSlash,
-		regexp:      reg,
-		reverse:     reverse.String(),
-		varsN:       varsN,
-		varsR:       varsR,
+		template:  template,
+		matchHost: matchHost,
+		regexp:    reg,
+		reverse:   reverse.String(),
+		varsN:     varsN,
+		varsR:     varsR,
 	}, nil
 }
 
@@ -111,8 +110,6 @@ type routeRegexp struct {
 	template string
 	// True for host match, false for path match.
 	matchHost bool
-	// The strictSlash value defined on the route, but disabled if PathPrefix was used.
-	strictSlash bool
 	// Expanded regexp.
 	regexp *regexp.Regexp
 	// Reverse template.
@@ -132,11 +129,7 @@ func (r *routeRegexp) Match(req *http.Request, match *RouteMatch) bool {
 }
 
 // url builds a URL part using the given values.
-func (r *routeRegexp) url(pairs ...string) (string, error) {
-	values, err := mapFromPairs(pairs...)
-	if err != nil {
-		return "", err
-	}
+func (r *routeRegexp) url(values map[string]string) (string, error) {
 	urlValues := make([]interface{}, len(r.varsN))
 	for k, v := range r.varsN {
 		value, ok := values[v]
@@ -215,7 +208,7 @@ func (v *routeRegexpGroup) setMatch(req *http.Request, m *RouteMatch, r *Route) 
 				m.Vars[v] = pathVars[k+1]
 			}
 			// Check if we should redirect.
-			if v.path.strictSlash {
+			if r.strictSlash {
 				p1 := strings.HasSuffix(req.URL.Path, "/")
 				p2 := strings.HasSuffix(v.path.template, "/")
 				if p1 != p2 {
