@@ -10,7 +10,7 @@ import (
 
 // NewRouter returns a new router instance.
 func NewRouter() *Router {
-	return &Router{namedRoutes: make(map[string]*Route)}
+	return &Router{namedRoutes: make(map[string]*Route), KeepContext: false}
 }
 
 // Router registers routes to be matched and dispatches a handler.
@@ -42,12 +42,14 @@ type Router struct {
 	namedRoutes map[string]*Route
 	// See Router.StrictSlash(). This defines the flag for new routes.
 	strictSlash bool
+	// If true, do not clear the the request context after handling the request
+	KeepContext bool
 }
 
 // Match matches registered routes against the request.
 func (r *Router) Match(req *http.Request, match *RouteMatch) bool {
 	for _, route := range r.routes {
-		if matched := route.Match(req, match); matched {
+		if route.Match(req, match) {
 			return true
 		}
 	}
@@ -67,7 +69,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	var match RouteMatch
 	var handler http.Handler
-	if matched := r.Match(req, &match); matched {
+	if r.Match(req, &match) {
 		handler = match.Handler
 		setVars(req, match.Vars)
 		setCurrentRoute(req, match.Route)
@@ -78,7 +80,9 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		handler = r.NotFoundHandler
 	}
-	defer context.Clear(req)
+	if !r.KeepContext {
+		defer context.Clear(req)
+	}
 	handler.ServeHTTP(w, req)
 }
 
