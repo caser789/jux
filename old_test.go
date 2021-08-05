@@ -1,3 +1,9 @@
+// Old tests ported to Go1. This is a mess. Want to drop it one day.
+
+// Copyright 2011 Gorilla Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package mux
 
 import (
@@ -379,6 +385,11 @@ var urlBuildingTests = []urlBuildingTest{
 		vars:  []string{"subdomain", "foo", "category", "technology", "id", "42"},
 		url:   "http://foo.domain.com/articles/technology/42",
 	},
+	{
+		route: new(Route).Host("example.com").Schemes("https", "http"),
+		vars:  []string{},
+		url:   "https://example.com",
+	},
 }
 
 func TestHeaderMatcher(t *testing.T) {
@@ -496,18 +507,6 @@ func TestUrlBuilding(t *testing.T) {
 		url := u.String()
 		if url != v.url {
 			t.Errorf("expected %v, got %v", v.url, url)
-			/*
-				reversePath := ""
-				reverseHost := ""
-				if v.route.pathTemplate != nil {
-						reversePath = v.route.pathTemplate.Reverse
-				}
-				if v.route.hostTemplate != nil {
-						reverseHost = v.route.hostTemplate.Reverse
-				}
-
-				t.Errorf("%#v:\nexpected: %q\ngot: %q\nreverse path: %q\nreverse host: %q", v.route, v.url, url, reversePath, reverseHost)
-			*/
 		}
 	}
 
