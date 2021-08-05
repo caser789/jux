@@ -31,7 +31,7 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, matchQuery, strictSlash,
 	// Now let's parse it.
 	defaultPattern := "[^/]+"
 	if matchQuery {
-		defaultPattern = "[^?&]*"
+		defaultPattern = ".*"
 	} else if matchHost {
 		defaultPattern = "[^.]+"
 		matchPrefix = false
