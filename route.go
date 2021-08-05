@@ -196,15 +196,7 @@ func (m headerMatcher) Match(r *http.Request, match *RouteMatch) bool {
 //               "X-Requested-With", "XMLHttpRequest")
 //
 // The above route will only match if both request header values match.
-// Alternatively, you can provide a regular expression and match the header as follows:
-//
-//     r.Headers("Content-Type", "application/(text|json)",
-//               "X-Requested-With", "XMLHttpRequest")
-//
-// The above route will the same as the previous example, with the addition of matching
-// application/text as well.
-//
-// It the value is an empty string, it will match any value if the key is set.
+// If the value is an empty string, it will match any value if the key is set.
 func (r *Route) Headers(pairs ...string) *Route {
 	if r.err == nil {
 		var headers map[string]string
@@ -251,7 +243,7 @@ func (r *Route) HeadersRegexp(pairs ...string) *Route {
 // For example:
 //
 //     r := mux.NewRouter()
-//     r.Host("www.domain.com")
+//     r.Host("www.example.com")
 //     r.Host("{subdomain}.domain.com")
 //     r.Host("{subdomain:[a-z]+}.domain.com")
 //
@@ -410,7 +402,7 @@ func (r *Route) BuildVarsFunc(f BuildVarsFunc) *Route {
 // It will test the inner routes only if the parent route matched. For example:
 //
 //     r := mux.NewRouter()
-//     s := r.Host("www.domain.com").Subrouter()
+//     s := r.Host("www.example.com").Subrouter()
 //     s.HandleFunc("/products/", ProductsHandler)
 //     s.HandleFunc("/products/{key}", ProductHandler)
 //     s.HandleFunc("/articles/{category}/{id:[0-9]+}"), ArticleHandler)
@@ -534,6 +526,30 @@ func (r *Route) URLPath(pairs ...string) (*url.URL, error) {
 	return &url.URL{
 		Path: path,
 	}, nil
+}
+
+// GetPathTemplate and GetHostTemplate returns the template used to match against for the route
+// This is userful for building simple REST API documentation,
+// and instrumentation for services like New Relic to ensure consistent reporting
+// The route must have a path defined.
+func (r *Route) GetPathTemplate() (string, error) {
+	if r.err != nil {
+		return "", r.err
+	}
+	if r.regexp == nil || r.regexp.path == nil {
+		return "", errors.New("mux: route doesn't have a path")
+	}
+	return r.regexp.path.template, nil
+}
+
+func (r *Route) GetHostTemplate() (string, error) {
+	if r.err != nil {
+		return "", r.err
+	}
+	if r.regexp == nil || r.regexp.host == nil {
+		return "", errors.New("mux: route doesn't have a host")
+	}
+	return r.regexp.host.template, nil
 }
 
 // prepareVars converts the route variable pairs into a map. If the route has a
