@@ -69,11 +69,8 @@ func newRouteRegexp(tpl string, matchHost, matchPrefix, matchQuery, strictSlash 
 				tpl[idxs[i]:end])
 		}
 		// Build the regexp pattern.
-		if patt[0] == '(' && patt[len(patt)-1] == ')' {
-			fmt.Fprintf(pattern, "%s%s", regexp.QuoteMeta(raw), patt)
-		} else {
-			fmt.Fprintf(pattern, "%s(%s)", regexp.QuoteMeta(raw), patt)
-		}
+		fmt.Fprintf(pattern, "%s(?P<%s>%s)", regexp.QuoteMeta(raw), varGroupName(i/2), patt)
+
 		// Build the reverse template.
 		fmt.Fprintf(reverse, "%s%%s", raw)
 
@@ -147,10 +144,11 @@ func (r *routeRegexp) Match(req *http.Request, match *RouteMatch) bool {
 	if !r.matchHost {
 		if r.matchQuery {
 			return r.matchQueryString(req)
-		} else {
-			return r.regexp.MatchString(req.URL.Path)
 		}
+
+		return r.regexp.MatchString(req.URL.Path)
 	}
+
 	return r.regexp.MatchString(getHost(req))
 }
 
@@ -180,10 +178,10 @@ func (r *routeRegexp) url(values map[string]string) (string, error) {
 	return rv, nil
 }
 
-// getUrlQuery returns a single query parameter from a request URL.
+// getURLQuery returns a single query parameter from a request URL.
 // For a URL with foo=bar&baz=ding, we return only the relevant key
 // value pair for the routeRegexp.
-func (r *routeRegexp) getUrlQuery(req *http.Request) string {
+func (r *routeRegexp) getURLQuery(req *http.Request) string {
 	if !r.matchQuery {
 		return ""
 	}
@@ -197,14 +195,14 @@ func (r *routeRegexp) getUrlQuery(req *http.Request) string {
 }
 
 func (r *routeRegexp) matchQueryString(req *http.Request) bool {
-	return r.regexp.MatchString(r.getUrlQuery(req))
+	return r.regexp.MatchString(r.getURLQuery(req))
 }
 
 // braceIndices returns the first level curly brace indices from a string.
 // It returns an error in case of unbalanced braces.
 func braceIndices(s string) ([]int, error) {
 	var level, idx int
-	idxs := make([]int, 0)
+	var idxs []int
 	for i := 0; i < len(s); i++ {
 		switch s[i] {
 		case '{':
@@ -274,10 +272,10 @@ func (v *routeRegexpGroup) setMatch(req *http.Request, m *RouteMatch, r *Route) 
 	}
 	// Store query string variables.
 	for _, q := range v.queries {
-		queryUrl := q.getUrlQuery(req)
-		matches := q.regexp.FindStringSubmatchIndex(queryUrl)
+		queryURL := q.getURLQuery(req)
+		matches := q.regexp.FindStringSubmatchIndex(queryURL)
 		if len(matches) > 0 {
-			extractVars(queryUrl, matches, q.varsN, m.Vars)
+			extractVars(queryURL, matches, q.varsN, m.Vars)
 		}
 	}
 }
