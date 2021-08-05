@@ -22,6 +22,9 @@ type Route struct {
 	// If true, when the path pattern is "/path/", accessing "/path" will
 	// redirect to the former and vice versa.
 	strictSlash bool
+	// If true, when the path pattern is "/path//to", accessing "/path//to"
+	// will not redirect
+	skipClean bool
 	// If true, this route never matches: it is only used to build URLs.
 	buildOnly bool
 	// The name used to build URLs.
@@ -213,8 +216,9 @@ func (m headerRegexMatcher) Match(r *http.Request, match *RouteMatch) bool {
 	return matchMapWithRegex(m, r.Header, true)
 }
 
-// Regular expressions can be used with headers as well.
-// It accepts a sequence of key/value pairs, where the value has regex support. For example
+// HeadersRegexp accepts a sequence of key/value pairs, where the value has regex
+// support. For example:
+//
 //     r := mux.NewRouter()
 //     r.HeadersRegexp("Content-Type", "application/(text|json)",
 //               "X-Requested-With", "XMLHttpRequest")
@@ -259,6 +263,7 @@ func (r *Route) Host(tpl string) *Route {
 // MatcherFunc is the function signature used by custom matchers.
 type MatcherFunc func(*http.Request, *RouteMatch) bool
 
+// Match returns the match for a given request.
 func (m MatcherFunc) Match(r *http.Request, match *RouteMatch) bool {
 	return m(r, match)
 }
@@ -528,10 +533,11 @@ func (r *Route) URLPath(pairs ...string) (*url.URL, error) {
 	}, nil
 }
 
-// GetPathTemplate and GetHostTemplate returns the template used to match against for the route
-// This is userful for building simple REST API documentation,
-// and instrumentation for services like New Relic to ensure consistent reporting
-// The route must have a path defined.
+// GetPathTemplate returns the template used to build the
+// route match.
+// This is useful for building simple REST API documentation and for instrumentation
+// against third-party services.
+// An error will be returned if the route does not define a path.
 func (r *Route) GetPathTemplate() (string, error) {
 	if r.err != nil {
 		return "", r.err
@@ -542,6 +548,11 @@ func (r *Route) GetPathTemplate() (string, error) {
 	return r.regexp.path.template, nil
 }
 
+// GetHostTemplate returns the template used to build the
+// route match.
+// This is useful for building simple REST API documentation and for instrumentation
+// against third-party services.
+// An error will be returned if the route does not define a host.
 func (r *Route) GetHostTemplate() (string, error) {
 	if r.err != nil {
 		return "", r.err
