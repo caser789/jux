@@ -48,12 +48,27 @@ func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
 	if r.buildOnly || r.err != nil {
 		return false
 	}
+
+	var matchErr error
+
 	// Match everything.
 	for _, m := range r.matchers {
 		if matched := m.Match(req, match); !matched {
+			if _, ok := m.(methodMatcher); ok {
+				matchErr = ErrMethodMismatch
+				continue
+			}
+			matchErr = nil
 			return false
 		}
 	}
+
+	if matchErr != nil {
+		match.MatchErr = matchErr
+		return false
+	}
+
+	match.MatchErr = nil
 	// Yay, we have a match. Let's collect some info about it.
 	if match.Route == nil {
 		match.Route = r
@@ -64,6 +79,7 @@ func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
 	if match.Vars == nil {
 		match.Vars = make(map[string]string)
 	}
+
 	// Set variables.
 	if r.regexp != nil {
 		r.regexp.setMatch(req, match, r)
@@ -392,7 +408,7 @@ func (r *Route) Schemes(schemes ...string) *Route {
 	for k, v := range schemes {
 		schemes[k] = strings.ToLower(v)
 	}
-	if r.getBuildScheme() == "" && len(schemes) > 0 {
+	if r.buildScheme == "" && len(schemes) > 0 {
 		r.buildScheme = schemes[0]
 	}
 	return r.addMatcher(schemeMatcher(schemes))
