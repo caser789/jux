@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"path"
 	"regexp"
-
-	"github.com/gorilla/context"
 )
 
 // NewRouter returns a new router instance.
@@ -46,7 +44,9 @@ type Router struct {
 	strictSlash bool
 	// See Router.SkipClean(). This defines the flag for new routes.
 	skipClean bool
-	// If true, do not clear the request context after handling the request
+	// If true, do not clear the request context after handling the request.
+	// This has no effect when go1.7+ is used, since the context is stored
+	// on the request itself.
 	KeepContext bool
 }
 
@@ -91,14 +91,14 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var handler http.Handler
 	if r.Match(req, &match) {
 		handler = match.Handler
-		setVars(req, match.Vars)
-		setCurrentRoute(req, match.Route)
+		req = setVars(req, match.Vars)
+		req = setCurrentRoute(req, match.Route)
 	}
 	if handler == nil {
 		handler = http.NotFoundHandler()
 	}
 	if !r.KeepContext {
-		defer context.Clear(req)
+		defer contextClear(req)
 	}
 	handler.ServeHTTP(w, req)
 }
@@ -134,7 +134,7 @@ func (r *Router) StrictSlash(value bool) *Router {
 }
 
 // SkipClean defines the path cleaning behaviour for new routes. The initial
-// value is false.
+// value is false. Users should be careful about which routes are not cleaned
 //
 // When true, if the route path is "/path//to", it will remain with the double
 // slash. This is helpful if you have a route like: /fetch/http://xkcd.com/534/
@@ -321,7 +321,7 @@ const (
 
 // Vars returns the route variables for the current request, if any.
 func Vars(r *http.Request) map[string]string {
-	if rv := context.Get(r, varsKey); rv != nil {
+	if rv := contextGet(r, varsKey); rv != nil {
 		return rv.(map[string]string)
 	}
 	return nil
@@ -333,22 +333,18 @@ func Vars(r *http.Request) map[string]string {
 // after the handler returns, unless the KeepContext option is set on the
 // Router.
 func CurrentRoute(r *http.Request) *Route {
-	if rv := context.Get(r, routeKey); rv != nil {
+	if rv := contextGet(r, routeKey); rv != nil {
 		return rv.(*Route)
 	}
 	return nil
 }
 
-func setVars(r *http.Request, val interface{}) {
-	if val != nil {
-		context.Set(r, varsKey, val)
-	}
+func setVars(r *http.Request, val interface{}) *http.Request {
+	return contextSet(r, varsKey, val)
 }
 
-func setCurrentRoute(r *http.Request, val interface{}) {
-	if val != nil {
-		context.Set(r, routeKey, val)
-	}
+func setCurrentRoute(r *http.Request, val interface{}) *http.Request {
+	return contextSet(r, routeKey, val)
 }
 
 // ----------------------------------------------------------------------------
